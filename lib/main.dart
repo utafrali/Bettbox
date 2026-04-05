@@ -12,7 +12,6 @@ import 'package:bett_box/state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
-import 'package:intl/intl.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'application.dart';
@@ -20,13 +19,23 @@ import 'clash/core.dart';
 import 'clash/lib.dart';
 import 'common/common.dart';
 import 'l10n/l10n.dart';
-import 'l10n/intl/messages_all.dart' show initializeMessages;
 import 'models/models.dart';
 
 const String _sentryDsn = String.fromEnvironment('SENTRY_DSN');
 
 ReceivePort? _serviceReceiverPort;
 ReceivePort? _messageReceiverPort;
+
+Future<void> _initL10n() async {
+  final locale = globalState.config.appSetting.locale?.isNotEmpty == true
+      ? utils.getLocaleForString(globalState.config.appSetting.locale!)
+      : WidgetsBinding.instance.platformDispatcher.locale;
+  if (locale != null) {
+    await AppLocalizations.load(locale);
+  } else {
+    await AppLocalizations.load(const Locale('zh', 'CN'));
+  }
+}
 
 Future<void> _initSentryAndRun(Future<void> Function() runner) async {
   assert(
@@ -126,6 +135,7 @@ Future<void> _service(List<String> flags) async {
   globalState.isService = true;
   WidgetsFlutterBinding.ensureInitialized();
   await globalState.init();
+  await _initL10n();
 
   await _initSentryAndRun(() async {
     final quickStart = flags.contains('quick');
@@ -153,32 +163,6 @@ Future<void> _service(List<String> flags) async {
     );
 
     vpn?.handleGetStartForegroundParams = () async {
-      final locale = globalState.config.appSetting.locale?.isNotEmpty == true
-          ? utils.getLocaleForString(globalState.config.appSetting.locale!)
-          : WidgetsBinding.instance.platformDispatcher.locale;
-      final normalizedLocale = locale == null
-          ? const Locale('zh', 'CN')
-          : (locale.languageCode.toLowerCase() == 'zh'
-                ? (((locale.countryCode?.toUpperCase() == 'TW') ||
-                          (locale.countryCode?.toUpperCase() == 'HK') ||
-                          (locale.countryCode?.toUpperCase() == 'MO') ||
-                          (locale.scriptCode?.toLowerCase() == 'hant'))
-                      ? const Locale('zh', 'TC')
-                      : const Locale('zh', 'CN'))
-                : locale);
-
-      await AppLocalizations.load(const Locale('zh', 'CN'));
-      if (normalizedLocale != const Locale('zh', 'CN')) {
-        final localeName = Intl.canonicalizedLocale(
-          (normalizedLocale.countryCode?.isEmpty ?? true)
-              ? normalizedLocale.languageCode
-              : normalizedLocale.toString(),
-        );
-        if (await initializeMessages(localeName)) {
-          await AppLocalizations.load(normalizedLocale);
-        }
-      }
-
       final isSmartStopped = await vpn?.isSmartStopped() ?? false;
 
       if (isSmartStopped) {
@@ -208,7 +192,9 @@ Future<void> _service(List<String> flags) async {
     }
 
     if (bootStart && !globalState.config.appSetting.autoRun) {
-      commonPrint.log('Silent boot detected, but autoRun is disabled. Staying idle.');
+      commonPrint.log(
+        'Silent boot detected, but autoRun is disabled. Staying idle.',
+      );
       _handleMainIpc(clashLibHandler);
       return;
     }
@@ -243,9 +229,13 @@ Future<void> _service(List<String> flags) async {
         await vpn?.start(clashLibHandler.getAndroidVpnOptions());
 
         if (globalState.config.appSetting.openLogs) {
-          await clashLibHandler.invokeAction('{"id": "quickStartLog", "method": "startLog"}');
+          await clashLibHandler.invokeAction(
+            '{"id": "quickStartLog", "method": "startLog"}',
+          );
         } else {
-          await clashLibHandler.invokeAction('{"id": "quickStopLog", "method": "stopLog"}');
+          await clashLibHandler.invokeAction(
+            '{"id": "quickStopLog", "method": "stopLog"}',
+          );
         }
 
         clashLibHandler.startListener();
