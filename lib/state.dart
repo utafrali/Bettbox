@@ -11,6 +11,7 @@ import 'package:bett_box/enum/enum.dart';
 import 'package:bett_box/l10n/l10n.dart';
 import 'package:bett_box/plugins/app.dart';
 import 'package:bett_box/plugins/service.dart';
+import 'package:bett_box/plugins/vpn.dart';
 import 'package:bett_box/providers/state.dart' as providers_state;
 import 'package:bett_box/widgets/dialog.dart';
 import 'package:flutter/material.dart';
@@ -239,7 +240,15 @@ class GlobalState {
   }
 
   Future updateStartTime() async {
-    startTime = await clashLib?.getRunTime();
+    final nativeStartTime = await clashLib?.getRunTime();
+    if (nativeStartTime != null) {
+      startTime = nativeStartTime;
+    } else {
+      final isRunning = await vpn?.getStatus() ?? false;
+      if (isRunning) {
+        startTime ??= DateTime.now();
+      }
+    }
   }
 
   void updateWakelockState(bool enabled) {

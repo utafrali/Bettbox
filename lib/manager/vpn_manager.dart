@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:bett_box/common/common.dart';
 import 'package:bett_box/enum/enum.dart';
+import 'package:bett_box/plugins/vpn.dart';
 import 'package:bett_box/providers/app.dart';
 import 'package:bett_box/providers/state.dart';
 import 'package:bett_box/state.dart';
@@ -18,6 +21,7 @@ class VpnManager extends ConsumerStatefulWidget {
 class _VpnContainerState extends ConsumerState<VpnManager> {
   @override
   void initState() {
+    _initVpnHandler();
     super.initState();
     ref.listenManual(vpnStateProvider, (prev, next) {
       // Skip tip
@@ -58,6 +62,26 @@ class _VpnContainerState extends ConsumerState<VpnManager> {
         );
       }
     });
+  }
+
+  void _initVpnHandler() {
+    if (!system.isAndroid) return;
+
+    vpn?.handleGetStartForegroundParams = () async {
+      final isSmartStopped = await vpn?.isSmartStopped() ?? false;
+
+      if (isSmartStopped) {
+        return json.encode({
+          'title': appLocalizations.coreSuspended,
+          'content': appLocalizations.smartAutoStopServiceRunning,
+        });
+      }
+
+      return json.encode({
+        'title': appLocalizations.coreConnected,
+        'content': appLocalizations.serviceRunning,
+      });
+    };
   }
 
   @override
