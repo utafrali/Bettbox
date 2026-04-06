@@ -4,20 +4,14 @@ import android.os.Looper
 import android.os.SystemClock
 import androidx.lifecycle.MutableLiveData
 import com.appshub.bettbox.plugins.AppPlugin
-import com.appshub.bettbox.plugins.ServicePlugin
 import com.appshub.bettbox.plugins.TilePlugin
 import com.appshub.bettbox.plugins.VpnPlugin
-import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.embedding.engine.dart.DartExecutor
-import io.flutter.plugins.GeneratedPluginRegistrant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -49,7 +43,6 @@ object GlobalState {
     private var pendingTimeoutJob: Job? = null
 
     var flutterEngine: FlutterEngine? = null
-    private var serviceEngine: FlutterEngine? = null
 
     @Volatile
     var isSmartStopped = false
@@ -118,8 +111,7 @@ object GlobalState {
     }
 
     fun getCurrentAppPlugin(): AppPlugin? {
-        val currentEngine = flutterEngine ?: serviceEngine
-        return currentEngine?.plugins?.get(AppPlugin::class.java) as? AppPlugin
+        return flutterEngine?.plugins?.get(AppPlugin::class.java) as? AppPlugin
     }
 
     fun syncStatus() {
@@ -130,12 +122,11 @@ object GlobalState {
     suspend fun getText(text: String): String = getCurrentAppPlugin()?.getText(text) ?: ""
 
     fun getCurrentTilePlugin(): TilePlugin? {
-        val currentEngine = flutterEngine ?: serviceEngine
-        return currentEngine?.plugins?.get(TilePlugin::class.java) as? TilePlugin
+        return flutterEngine?.plugins?.get(TilePlugin::class.java) as? TilePlugin
     }
 
     fun getCurrentVPNPlugin(): VpnPlugin? {
-        return serviceEngine?.plugins?.get(VpnPlugin::class.java) as? VpnPlugin
+        return flutterEngine?.plugins?.get(VpnPlugin::class.java) as? VpnPlugin
     }
 
     fun handleToggle() {
@@ -152,7 +143,11 @@ object GlobalState {
         updateRunState(RunState.PENDING)
         startPendingTimeout()
         runLock.withLock {
-            getCurrentTilePlugin()?.handleStart() ?: initServiceEngine()
+            if (flutterEngine != null) {
+                getCurrentTilePlugin()?.handleStart() ?: VpnPlugin.startLastKnownProfile()
+            } else {
+                VpnPlugin.startLastKnownProfile()
+            }
         }
         return true
     }
@@ -164,7 +159,11 @@ object GlobalState {
         updateRunState(RunState.PENDING)
         startPendingTimeout()
         runLock.withLock {
-            getCurrentTilePlugin()?.handleStop()
+            if (flutterEngine != null) {
+                getCurrentTilePlugin()?.handleStop() ?: VpnPlugin.handleStop()
+            } else {
+                VpnPlugin.handleStop()
+            }
         }
     }
 
@@ -177,41 +176,5 @@ object GlobalState {
         }
     }
 
-    fun handleTryDestroy() {
-        if (flutterEngine == null) destroyServiceEngine()
-    }
-
-    fun destroyServiceEngine() {
-        runLock.withLock {
-            serviceEngine?.destroy()
-            serviceEngine = null
-        }
-    }
-
-    fun initServiceEngine(flags: List<String>? = null) {
-        if (serviceEngine != null) return
-        destroyServiceEngine()
-        runLock.withLock {
-            serviceEngine = FlutterEngine(BettboxApplication.getAppContext()).apply {
-                plugins.add(VpnPlugin)
-                plugins.add(AppPlugin())
-                plugins.add(TilePlugin())
-                plugins.add(ServicePlugin())
-                GeneratedPluginRegistrant.registerWith(this)
-            }
-            val vpnService = DartExecutor.DartEntrypoint(
-                FlutterInjector.instance().flutterLoader().findAppBundlePath(),
-                "_service"
-            )
-            val defaultArgs = if (flutterEngine == null && !isCurrentlyStopping()) listOf("quick") else null
-            val args = flags ?: defaultArgs
-            serviceEngine?.dartExecutor?.executeDartEntrypoint(vpnService, args)
-        }
-    }
-
-    fun isServiceEngineRunning(): Boolean = serviceEngine != null
-
-    fun reconnectIpc() {
-        (serviceEngine?.plugins?.get(TilePlugin::class.java) as? TilePlugin)?.handleReconnectIpc()
-    }
+    fun handleTryDestroy() = Unit
 }

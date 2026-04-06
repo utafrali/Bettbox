@@ -87,6 +87,37 @@ fun Service.ensureNotificationChannel() {
     }
 }
 
+fun Service.startFallbackForeground(content: String = "") {
+    val launchIntent = (packageManager.getLaunchIntentForPackage(packageName) ?: Intent().apply {
+        component = ComponentName(packageName, "com.appshub.bettbox.MainActivity")
+        action = Intent.ACTION_MAIN
+        addCategory(Intent.CATEGORY_LAUNCHER)
+    }).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+    }
+    val flags = if (Build.VERSION.SDK_INT >= 31) {
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    } else {
+        PendingIntent.FLAG_UPDATE_CURRENT
+    }
+    val pendingIntent = PendingIntent.getActivity(this, 0, launchIntent, flags)
+    val builder = NotificationCompat.Builder(this, GlobalState.NOTIFICATION_CHANNEL)
+        .setSmallIcon(R.drawable.ic)
+        .setContentTitle("Bettbox")
+        .setContentText(content.ifBlank { null })
+        .setCategory(NotificationCompat.CATEGORY_SERVICE)
+        .setContentIntent(pendingIntent)
+        .setOngoing(true)
+        .setShowWhen(false)
+        .setOnlyAlertOnce(true)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        builder.foregroundServiceBehavior = FOREGROUND_SERVICE_IMMEDIATE
+    }
+    val notification = builder
+        .build()
+    startForeground(notification)
+}
+
 @SuppressLint("ForegroundServiceType")
 fun Service.startForeground(notification: Notification) {
     ensureNotificationChannel()

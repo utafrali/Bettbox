@@ -468,7 +468,6 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     private fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
         if (!isActivityAttached) return false
         if (requestCode == VPN_PERMISSION_REQUEST_CODE && resultCode == FlutterActivity.RESULT_OK) {
-            GlobalState.initServiceEngine()
             vpnCallBack?.invoke()
         }
         return true

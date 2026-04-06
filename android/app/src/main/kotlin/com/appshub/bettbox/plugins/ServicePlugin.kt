@@ -77,17 +77,14 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             }
             "init" -> {
                 GlobalState.getCurrentAppPlugin()?.requestNotificationsPermission()
-                GlobalState.initServiceEngine()
                 result.success(true)
             }
-            "isServiceEngineRunning" -> result.success(GlobalState.isServiceEngineRunning())
+            "isServiceEngineRunning" -> result.success(GlobalState.flutterEngine != null)
             "status" -> result.success(GlobalState.currentRunState == RunState.START)
             "reconnectIpc" -> {
-                GlobalState.reconnectIpc()
                 result.success(true)
             }
             "destroy" -> {
-                GlobalState.destroyServiceEngine()
                 result.success(true)
             }
             else -> result.notImplemented()

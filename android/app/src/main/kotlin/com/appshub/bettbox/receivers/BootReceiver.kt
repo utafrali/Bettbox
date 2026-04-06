@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.appshub.bettbox.GlobalState
+import com.appshub.bettbox.plugins.VpnPlugin
 
 class BootReceiver : BroadcastReceiver() {
     companion object {
@@ -23,8 +23,8 @@ class BootReceiver : BroadcastReceiver() {
             val autoLaunch = prefs.getBoolean(AUTO_LAUNCH_KEY, false)
 
             if (autoLaunch) {
-                Log.d(TAG, "AutoLaunch enabled, triggering silent background boot")
-                GlobalState.initServiceEngine(listOf("boot"))
+                Log.d(TAG, "AutoLaunch enabled, starting cached profile")
+                VpnPlugin.startLastKnownProfile()
             } else {
                 Log.d(TAG, "AutoLaunch disabled, skipping background boot")
             }

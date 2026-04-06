@@ -14,9 +14,14 @@ import com.appshub.bettbox.GlobalState
 import com.appshub.bettbox.models.VpnOptions
 
 class BettboxService : Service(), BaseServiceInterface {
+    companion object {
+        private const val ACTION_START = "com.appshub.bettbox.action.START_SERVICE"
+    }
 
     private var cachedBuilder: NotificationCompat.Builder? = null
     private val binder = LocalBinder()
+    @Volatile
+    private var isStopped = false
 
     inner class LocalBinder : Binder() {
         fun getService() = this@BettboxService
@@ -24,7 +29,17 @@ class BettboxService : Service(), BaseServiceInterface {
 
     override suspend fun start(options: VpnOptions) = 0
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_START) {
+            isStopped = false
+            startFallbackForeground()
+        }
+        return START_NOT_STICKY
+    }
+
     override fun stop() {
+        if (isStopped) return
+        isStopped = true
         stopSelf()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             stopForeground(STOP_FOREGROUND_REMOVE)

@@ -22,15 +22,11 @@ import com.appshub.bettbox.plugins.VpnPlugin
 class BettboxVpnService : VpnService(), BaseServiceInterface {
     companion object {
         private const val TAG = "BettboxVpnService"
+        private const val ACTION_START = "com.appshub.bettbox.action.START_SERVICE"
     }
 
     @Volatile
     private var isStopped = false
-
-    override fun onCreate() {
-        super.onCreate()
-        GlobalState.initServiceEngine()
-    }
 
     override suspend fun start(options: VpnOptions): Int = with(Builder()) {
         options.ipv4Address.takeIf { it.isNotEmpty() }?.let { ipv4 ->
@@ -89,7 +85,14 @@ class BettboxVpnService : VpnService(), BaseServiceInterface {
         -1
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_NOT_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_START) {
+            isStopped = false
+            runCatching { startFallbackForeground() }
+                .onFailure { Log.e(TAG, "Failed to show fallback notification: ${it.message}") }
+        }
+        return START_NOT_STICKY
+    }
 
     override fun stop() {
         if (isStopped) return
